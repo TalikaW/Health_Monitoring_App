@@ -1,2 +1,2 @@
-# Health_System_app
-This is App build on Flutter Framework
+# Flask-API
+API to Fetch and Store in the Database
