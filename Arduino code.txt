@@ -1,0 +1,78 @@
+#include <Wire.h>
+#include "MAX30100_PulseOximeter.h"
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
+
+#define BLYNK_PRINT Serial
+#define REPORTING_PERIOD_MS 1000
+
+// Replace with your network credentials
+const char* ssid = "vivo";
+const char* password = "eshaan12";
+
+PulseOximeter pox;
+ESP8266WebServer server(80);
+
+float BPM, SpO2;
+uint32_t tsLastReport = 0;
+
+void onBeatDetected() {
+    Serial.println("Beat Detected!");
+}
+
+// Send the data in JSON format
+void handleRoot() {
+    String json = "{";
+    json += "\"heart_rate\":" + String(BPM) + ",";
+    json += "\"SpO2\":" + String(SpO2);
+    json += "}";
+    
+    server.send(200, "application/json", json);
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    // Initialize WiFi with DHCP
+    WiFi.begin(ssid, password);
+    while (WiFi.status() != WL_CONNECTED) {
+        delay(1000);
+        Serial.println("Connecting to WiFi...");
+    }
+    Serial.println("Connected to WiFi");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
+
+    Serial.println("Initializing pulse oximeter...");
+    if (!pox.begin()) {
+        Serial.println("FAILED");
+        for(;;);
+    } else {
+        Serial.println("SUCCESS");
+        pox.setOnBeatDetectedCallback(onBeatDetected);
+    }
+
+    // Start the web server
+    server.on("/", handleRoot);
+    server.begin();
+    Serial.println("HTTP server started");
+}
+
+void loop() {
+    pox.update();
+
+    BPM = pox.getHeartRate();
+    SpO2 = pox.getSpO2();
+    
+    if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
+        Serial.print("Heart rate: ");
+        Serial.print(BPM);
+        Serial.print(" bpm / SpO2: ");
+        Serial.print(SpO2);
+        Serial.println(" %");
+        tsLastReport = millis();
+    }
+
+    // Handle client requests
+    server.handleClient();
+}
